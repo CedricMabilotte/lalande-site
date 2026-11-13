@@ -4,6 +4,8 @@ import pathlib, sys
 OUT = pathlib.Path(sys.argv[1])
 BASE = (sys.argv[2] if len(sys.argv)>2 else "https://cedricmabilotte.github.io/lalande-site/").rstrip("/")+"/"
 import urllib.parse as U
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import icones as ic
 TEL, TEL_HREF = "06 44 87 29 37", "+33644872937"
 MAIL = "lucileloup.66@gmail.com"
 
@@ -16,10 +18,7 @@ T = {
   path="", og_locale="fr_FR",
   share_t="Partager l'annonce", share_intro="Vous connaissez un collectif ou un porteur de projet que ce lieu pourrait intéresser ? Faites-lui suivre l'annonce.",
   share_msg="Ferme bio de 94 ha à transmettre en Haute-Vienne : élevage Limousin inscrit, bâti, eau, bois et verger. Pour un collectif ou un porteur de projet préfinancé.",
-  copier="Copier le lien", copie="Lien copié", partager="Partager…",
-  vis_t="Visuels prêts à publier", vis_intro="À télécharger et publier avec le texte ci-dessus.",
-  vis=[("carre","Carré 1080 × 1080","Instagram, Facebook"),("story","Story 1080 × 1920","stories Instagram, Facebook, WhatsApp"),("paysage","Paysage 1200 × 630","Facebook, LinkedIn, X, Telegram")],
-  texte_t="Texte à copier",
+  copier="Copier le lien", copie="Lien copié", copier_msg="Copier le message", copie_msg="Message copié", partager="Partager l'annonce", mail="E-mail", partager_court="Partager",
   chiffres="94 ha d'un seul tenant · Bio depuis plus de 30 ans · Limousines inscrites HBL",
   lieu="Haute-Vienne, Limousin",
   chapo="Au cœur d'un environnement naturel préservé, une ferme familiale conduite avec exigence et respect du vivant, aujourd'hui disponible pour transmission.",
@@ -63,10 +62,7 @@ T = {
   path="en/", og_locale="en_GB",
   share_t="Share this listing", share_intro="Do you know a collective or a project leader who might be interested? Please pass the listing on.",
   share_msg="94 ha organic farm available for transfer in Haute-Vienne, France: pedigree Limousin herd, buildings, water, woods and orchard. For pre-financed collectives or project leaders.",
-  copier="Copy link", copie="Link copied", partager="Share…",
-  vis_t="Ready-to-post images", vis_intro="Download and post them with the text above.",
-  vis=[("carre","Square 1080 × 1080","Instagram, Facebook"),("story","Story 1080 × 1920","Instagram, Facebook and WhatsApp stories"),("paysage","Landscape 1200 × 630","Facebook, LinkedIn, X, Telegram")],
-  texte_t="Text to copy",
+  copier="Copy link", copie="Link copied", copier_msg="Copy message", copie_msg="Message copied", partager="Share this listing", mail="Email", partager_court="Share",
   chiffres="94 ha in a single block · Organic for over 30 years · Pedigree Limousin herd (HBL)",
   lieu="Haute-Vienne, Limousin, France",
   chapo="Set in an unspoilt natural environment, a family farm managed with high standards and respect for living things, now available for transfer.",
@@ -107,31 +103,39 @@ T = {
 def li(xs): return "\n".join(f"      <li>{x}</li>" for x in xs)
 
 def share(t, url):
-    pre = "" if t["lang"]=="fr" else "../"
     m = U.quote(t["share_msg"]); u = U.quote(url, safe="")
-    links = [("WhatsApp", f"https://wa.me/?text={m}%20{u}"),
-             ("Facebook", f"https://www.facebook.com/sharer/sharer.php?u={u}"),
-             ("LinkedIn", f"https://www.linkedin.com/sharing/share-offsite/?url={u}"),
-             ("Telegram", f"https://t.me/share/url?url={u}&text={m}"),
-             ("X", f"https://x.com/intent/post?text={m}&url={u}"),
-             ("Email", f"mailto:?subject={U.quote(t['title'])}&body={m}%0A%0A{u}")]
-    btn = "".join(f'<a class="btn" href="{h}" target="_blank" rel="noopener">{n}</a>' for n,h in links)
-    vis = "".join(f'<figure class="vis vis-{k}"><a href="{pre}partage/{t["lang"]}-{k}.jpg" download><img src="{pre}partage/{t["lang"]}-{k}.jpg" alt="{l}" loading="lazy"></a><figcaption><strong>{l}</strong><br>{use}</figcaption></figure>' for k,l,use in t["vis"])
+    reseaux = [  # (pictogramme, libellé, lien, popup sur ordinateur, réservé au mobile)
+        ("whatsapp", "WhatsApp", f"https://wa.me/?text={m}%20{u}", False, False),
+        ("facebook", "Facebook", f"https://www.facebook.com/sharer/sharer.php?u={u}", True, False),
+        ("linkedin", "LinkedIn", f"https://www.linkedin.com/sharing/share-offsite/?url={u}", True, False),
+        ("telegram", "Telegram", f"https://t.me/share/url?url={u}&text={m}", False, False),
+        ("x", "X", f"https://x.com/intent/post?text={m}&url={u}", True, False),
+        ("sms", "SMS", f"sms:?&body={m}%20{u}", False, True),
+        ("mail", t["mail"], f"mailto:?subject={U.quote(t['title'])}&body={m}%0A%0A{u}", False, False),
+    ]
+    liens = "".join(
+        f'<a class="part" href="{h}"{" data-popup" if pop else ""}{" data-mobile" if mob else ""} target="_blank" rel="noopener">{ic.svg(k)}<span>{n}</span></a>'
+        for k, n, h, pop, mob in reseaux)
+    copie = (f'<button type="button" class="part" data-copier="{url}" data-ok="{t["copie"]}">{ic.svg("lien")}<span>{t["copier"]}</span></button>'
+             f'<button type="button" class="part" data-copier="{t["share_msg"]} {url}" data-ok="{t["copie_msg"]}">{ic.svg("texte")}<span>{t["copier_msg"]}</span></button>')
     return f"""  <section class="partage" id="partager">
     <h2>{t['share_t']}</h2>
     <p>{t['share_intro']}</p>
-    <div class="btns">{btn}<button type="button" class="btn" data-copier="{url}" data-ok="{t['copie']}">{t['copier']}</button><button type="button" class="btn natif" hidden data-titre="{t['title']}" data-texte="{t['share_msg']}" data-url="{url}">{t['partager']}</button></div>
-    <h3>{t['texte_t']}</h3>
-    <p class="texte-partage">{t['share_msg']}<br>{url}</p>
-    <h3>{t['vis_t']}</h3>
-    <p class="note">{t['vis_intro']}</p>
-    <div class="visuels">{vis}</div>
+    <button type="button" class="natif" hidden data-titre="{t['title']}" data-texte="{t['share_msg']}" data-url="{url}">{ic.svg("partager")}<span>{t['partager']}</span></button>
+    <div class="parts">{liens}{copie}</div>
   </section>"""
 
 JS = """<script>
-document.querySelectorAll('[data-copier]').forEach(function(b){b.addEventListener('click',function(){
-  var t=b.textContent;(navigator.clipboard?navigator.clipboard.writeText(b.dataset.copier):Promise.reject()).then(function(){b.textContent=b.dataset.ok;setTimeout(function(){b.textContent=t},2000)}).catch(function(){prompt('',b.dataset.copier)})})});
-var n=document.querySelector('.natif');if(n&&navigator.share){n.hidden=false;n.addEventListener('click',function(){navigator.share({title:n.dataset.titre,text:n.dataset.texte,url:n.dataset.url}).catch(function(){})})}
+(function(){
+var mobile=matchMedia('(pointer:coarse)').matches;
+document.querySelectorAll('[data-mobile]').forEach(function(a){if(!mobile)a.hidden=true});
+document.querySelectorAll('[data-popup]').forEach(function(a){a.addEventListener('click',function(e){
+  if(mobile)return;var w=620,h=640,x=screenX+(outerWidth-w)/2,y=screenY+(outerHeight-h)/2;
+  if(window.open(a.href,'partage','width='+w+',height='+h+',left='+x+',top='+y+',noopener'))e.preventDefault()})});
+document.querySelectorAll('[data-copier]').forEach(function(b){var s=b.querySelector('span'),t=s.textContent;b.addEventListener('click',function(){
+  (navigator.clipboard?navigator.clipboard.writeText(b.dataset.copier):Promise.reject()).then(function(){s.textContent=b.dataset.ok;b.classList.add('ok');setTimeout(function(){s.textContent=t;b.classList.remove('ok')},2200)}).catch(function(){prompt('',b.dataset.copier)})})});
+var n=document.querySelector('.natif');if(n&&navigator.share&&mobile){n.hidden=false;n.addEventListener('click',function(){navigator.share({title:n.dataset.titre,text:n.dataset.texte,url:n.dataset.url}).catch(function(){})})}
+})();
 </script>"""
 
 def page(t):
@@ -162,7 +166,7 @@ def page(t):
 </head>
 <body>
 <div class="wrap">
-<header class="top"><span>{t['lieu']}</span><a href="{t['autre']}" lang="{'en' if t['lang']=='fr' else 'fr'}">{t['autre_txt']}</a></header>
+<header class="top"><span>{t['lieu']}</span><nav><a href="#partager">{t['partager_court']}</a><a href="{t['autre']}" lang="{'en' if t['lang']=='fr' else 'fr'}">{t['autre_txt']}</a></nav></header>
 <main>
   <div class="hero">
     <h1>{t['h1']}</h1>
